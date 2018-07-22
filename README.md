@@ -3,7 +3,7 @@
 Reads a [`otpauth://`](https://github.com/google/google-authenticator/wiki/Key-Uri-Format)
 URI on the first argument, or from the standard input, and invokes
 [`oathtool`](https://www.nongnu.org/oath-toolkit/) with the parameters from the
-URI set, allowing extra parameters to be passed to `oathtool`.
+URI set, allowing extra options to be passed to `oathtool`.
 
 ## Examples
 
@@ -35,4 +35,20 @@ The `algorithm`, `digits` and `period` (for TOTP) parameters are also supported:
 ```
 $ ./oathtool_from_otpauth_uri "otpauth://totp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&algorithm=SHA512&digits=8&period=60"
 55435877
+```
+
+Extra options may also be passed to `oathtool`:
+
+```
+$ ./oathtool_from_otpauth_uri "otpauth://hotp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&counter=1618" -w4
+217735
+102957
+102067
+856315
+674037
+```
+
+```
+$ ./oathtool_from_otpauth_uri "otpauth://totp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co" -N "2008-04-23 17:42:17 UTC"
+258832
 ```
