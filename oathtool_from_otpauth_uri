@@ -87,7 +87,7 @@ fi
 # OTP Type
 otp_type="$(uri_get_path_segment "$otpauth_uri" 1)"
 if [ "$otp_type" != "hotp" ] && [ "$otp_type" != "totp" ]; then
-    echo_err "Invalid otpauth URI: Invalid type '${otp_type#--}'. Aborting."
+    echo_err "Invalid otpauth URI: Invalid type '$otp_type'. Aborting."
     exit 2
 fi
 
