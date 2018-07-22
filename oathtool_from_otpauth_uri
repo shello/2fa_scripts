@@ -1,0 +1,141 @@
+#!/usr/bin/env sh
+
+script_name="$0"
+
+usage_str="$script_name [-h] [otpauth_uri] [oathtool options...]"
+descr_str=\
+"Invokes oathtool with the parameters from a otpauth:// uri passed as the first
+parameter, or from standard input."
+
+echo_err () {
+    echo "${script_name}: $*" >&2
+}
+
+# uri_get_query_value <uri> <query_key>
+uri_get_query_value() {
+    # Remove leading part up to the end of "<query_key>="
+    _qkv="${1##*$2=}"
+
+    # If the string is the same, then <query_key> is not present
+    if [ "$_qkv" = "$1" ]; then
+        return 1
+    fi
+
+    # Remove the trailing portion of the URI (after the next "&") pass
+    echo "${_qkv%%&*}"
+
+    return 0
+}
+
+# uri_get_path_segment <uri> <one-based-counter>
+uri_get_path_segment() {
+    # Isolate the path
+    _path="${1#*://}"
+    _path="${_path%%\?*}"
+
+    # Remove path segments one by one
+    _segment_ctr="$2"
+    while [ "$_segment_ctr" -gt 1 ]; do
+        _segment_ctr=$(( _segment_ctr - 1))
+
+        _new_path="${_path#*/}"
+        if [ "$_new_path" = "$_path" ]; then
+            # If the string remains the same, it means there are no more path
+            # segments to remove. It's safe to break the loop setting _path to
+            # an empty string, signaling the nonexistence of the segment
+            _path=""
+            break
+        else
+            _path="$_new_path"
+        fi
+    done
+
+    # Remove the remaining path
+    if [ -n "$_path" ]; then
+        echo "${_path%%/*}"
+    else
+        return 1
+    fi
+}
+
+# Show help and description if the first argument is -h
+if [ "$1" = "-h" ]; then
+    echo "Usage: $usage_str"
+    echo "$descr_str"
+    exit 0
+fi
+
+
+# Obtain the otpauth:// uri from argument or stdin
+otpauth_uri=""
+
+if [ "${1%%://*}" = "otpauth" ]; then
+    otpauth_uri="$1"
+    shift
+else
+    read -r otpauth_uri
+
+    if [ "${otpauth_uri%%://*}" != "otpauth" ]; then
+        echo_err "Input is not an otpauth:// URI. Aborting."
+        exit 2
+    fi
+fi
+
+
+# Parse the otpauth URI parts for passing to oathtool
+
+# OTP Type
+otp_type="$(uri_get_path_segment "$otpauth_uri" 1)"
+if [ "$otp_type" != "hotp" ] && [ "$otp_type" != "totp" ]; then
+    echo_err "Invalid otpauth URI: Invalid type '${otp_type#--}'. Aborting."
+    exit 2
+fi
+
+# Secret
+secret=$(uri_get_query_value "$otpauth_uri" secret)
+if [ -z "$secret" ]; then
+    echo_err "Missing secret parameter on URI. Aborting."
+    exit 2
+fi
+
+# Algorithm, only for TOTP
+if [ "$otp_type" = "totp" ]; then
+    totp_algorithm=$(uri_get_query_value "$otpauth_uri" algorithm)
+    if [ -n "$totp_algorithm" ]; then
+        # oathtool only supports lower-case algorithms
+        totp_algorithm="$(echo "$totp_algorithm" | tr "[:upper:]" "[:lower:]")"
+    fi
+fi
+
+# Digits (defaults to 6)
+otp_digits="$(uri_get_query_value "$otpauth_uri" digits)"
+otp_digits="${otp_digits:-6}"
+
+# Counter, required, only for HOTP
+if [ "$otp_type" = "hotp" ]; then
+    hotp_counter="$(uri_get_query_value "$otpauth_uri" counter)"
+    if [ -z "$hotp_counter" ]; then
+        echo_err "Missing counter parameter on URI. Aborting."
+        exit 2
+    fi
+fi
+
+# Period, in seconds, only for TOTP (defaults to 30)
+if [ "$otp_type" = "totp" ]; then
+    totp_period="$(uri_get_query_value "$otpauth_uri" period)"
+    totp_period="${totp_period:-30}"
+fi
+
+
+# shellcheck disable=SC2086
+# otpauth:// URIs always include the secret encoded in Base32
+oathtool --base32 \
+    --$otp_type${totp_algorithm:+="$totp_algorithm"} \
+    --digits="$otp_digits" \
+    ${hotp_counter:+--counter=$hotp_counter} \
+    ${totp_period:+--time-step-size=${totp_period}s} \
+    "$@" "$secret"
+
+
+# References:
+# - https://github.com/google/google-authenticator/wiki/Key-Uri-Format
