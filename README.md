@@ -23,7 +23,7 @@ $ ./oathtool_from_otpauth_uri "otpauth://hotp/ACME%20Co:john.doe@email.com?secre
 ```
 
 It is possible to pass the URI to `./oathtool_from_otpauth_uri` from the
-Standard Input using a pipe:
+standard input using a pipe:
 
 ```
 $ echo "otpauth://hotp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&counter=1618" | ./oathtool_from_otpauth_uri
