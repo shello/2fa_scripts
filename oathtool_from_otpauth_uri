@@ -98,6 +98,12 @@ if [ -z "$secret" ]; then
     exit 2
 fi
 
+# Remove any padding from the end of the secret string
+# While no padding should be included with the secret, according to the
+# key uri spec, it doesn't hurt to remove it at this stage.
+# Source: https://github.com/google/google-authenticator/wiki/Key-Uri-Format#secret
+secret=$(echo "$secret" | sed 's/\(=\|%3D\)\+$//i')
+
 # Algorithm, only for TOTP
 if [ "$otp_type" = "totp" ]; then
     totp_algorithm=$(uri_get_query_value "$otpauth_uri" algorithm)
